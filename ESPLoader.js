@@ -1,4 +1,5 @@
 import {ESPError, TimeoutError} from "./error.js";
+import pako from 'pako';
 
 const MAGIC_TO_CHIP = {
     [0x00f01d83]: () => import('./targets/esp32.js'),
