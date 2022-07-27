@@ -883,23 +883,26 @@ class ESPLoader {
         this.log("Detected flash size: " + this.DETECTED_FLASH_SIZES[flid_lowbyte]);
     }
 
-    async hard_reset() {
-        this.transport.setRTS(true);  // EN->LOW
+    hard_reset = async() => {
+        await this.transport.setDTR(false);
+        await this.transport.setRTS(false);
         await this._sleep(100);
-        this.transport.setRTS(false);
+        await this.transport.setRTS(true);
+        await this._sleep(100);
+        await this.transport.setRTS(false);
     }
 
-    async soft_reset() {
+    soft_reset = async() => {
         if (!this.IS_STUB) {
             // 'run user code' is as close to a soft reset as we can do
-            this.flash_begin(0, 0);
-            this.flash_finish(false);
+            await this.flash_begin(0, 0);
+            await this.flash_finish(false);
         } else if (this.chip.CHIP_NAME != "ESP8266") {
             throw new ESPError("Soft resetting is currently only supported on ESP8266");
         } else {
             // running user code from stub loader requires some hacks
             // in the stub loader
-            this.command({op: this.ESP_RUN_USER_CODE, wait_response: false});
+            await this.command({op: this.ESP_RUN_USER_CODE, wait_response: false});
         }
     }
 }
