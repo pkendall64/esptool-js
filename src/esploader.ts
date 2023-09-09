@@ -1215,7 +1215,7 @@ export class ESPLoader {
    * @param {string} mode Reset mode to use
    * @returns {ROM} chip ROM
    */
-  async main(mode = "default_reset") {
+  async main(mode = "default_reset", stub = "yes") {
     await this.detectChip(mode);
 
     const chip = await this.chip.getChipDescription(this);
@@ -1229,10 +1229,12 @@ export class ESPLoader {
       await this.chip.postConnect(this);
     }
 
-    await this.runStub();
+    if (stub === "yes") {
+      await this.runStub();
 
-    if (this.romBaudrate !== this.baudrate) {
-      await this.changeBaud();
+      if (this.romBaudrate !== this.baudrate) {
+        await this.changeBaud();
+      }
     }
     return chip;
   }
