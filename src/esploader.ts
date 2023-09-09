@@ -1488,6 +1488,9 @@ export class ESPLoader {
    * Perform a chip hard reset by setting RTS to LOW and then HIGH.
    */
   async hardReset() {
+    await this.transport.setDTR(false);
+    await this.transport.setRTS(false);
+    await this._sleep(100);
     await this.transport.setRTS(true); // EN->LOW
     await this._sleep(100);
     await this.transport.setRTS(false);
