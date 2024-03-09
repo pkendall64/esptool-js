@@ -598,6 +598,9 @@ class ESPLoader {
         pkt = this._appendArray(pkt, this._int_to_bytearray(0));
 
         let res = await this.check_command({op_description: "calculate md5sum", op: this.ESP_SPI_FLASH_MD5, data:pkt, timeout:timeout});
+        if (res.length == 36) {
+            return this.ui8ToBstr(res.slice(0,32));
+        }
         if (res.length > 16) {
             res = res.slice(0, 16);
         }
@@ -666,7 +669,7 @@ class ESPLoader {
         }
     }
 
-    async main_fn({mode='default_reset'} = {}) {
+    async main_fn({mode='default_reset', stub='yes'} = {}) {
         await this.detect_chip({mode});
 
         var chip = await this.chip.get_chip_description(this);
@@ -680,9 +683,10 @@ class ESPLoader {
             await this.chip._post_connect(this);
         }
 
-        await this.run_stub();
-
-        await this.change_baud();
+        if (stub == 'yes') {
+            await this.run_stub();
+            await this.change_baud();
+        }
         return chip;
     }
 
@@ -802,6 +806,7 @@ class ESPLoader {
                 blocks = await this.flash_defl_begin(uncsize, image.length, address);
             } else {
                 blocks = await this.flash_begin(uncsize, address);
+                image = this.bstrToUi8(image);
             }
             let seq = 0;
             let bytes_sent = 0;
@@ -817,6 +822,10 @@ class ESPLoader {
                 console.log("Write loop " + address + " " + seq + " " + blocks);
                 this.log("Writing at 0x" + (address + (seq * this.FLASH_WRITE_SIZE)).toString(16) + "... ("+ Math.floor(100 * (seq + 1) / blocks) + "%)");
                 let block = image.slice(0, this.FLASH_WRITE_SIZE);
+                let block_timeout = 5000;
+                if (this.IS_STUB === false) {
+                    timeout = block_timeout;
+                }
                 if (compress) {
                     /*
                     let block_uncompressed = pako.inflate(block).length;
@@ -827,16 +836,12 @@ class ESPLoader {
                     } else {
                         block_timeout = 3000;
                     }*/ // XXX: Partial block inflate seems to be unsupported in Pako. Hardcoding timeout
-                    let block_timeout = 5000;
-                    if (this.IS_STUB === false) {
-                        timeout = block_timeout;
-                    }
                     await this.flash_defl_block(block, seq, timeout);
-                    if (this.IS_STUB) {
-                        timeout = block_timeout;
-                    }
                 } else {
-                    throw new ESPError("Yet to handle Non Compressed writes");
+                    await this.flash_block(block, seq, timeout);
+                }
+                if (this.IS_STUB) {
+                    timeout = block_timeout;
                 }
                 bytes_sent += block.length;
                 image = image.slice(this.FLASH_WRITE_SIZE, image.length);
