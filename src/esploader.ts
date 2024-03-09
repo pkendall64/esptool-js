@@ -254,6 +254,7 @@ export class ESPLoader {
   private terminal?: IEspLoaderTerminal;
   private romBaudrate = 115200;
   private debugLogging = false;
+  private syncStubDetected = false;
 
   /**
    * Create a new ESPLoader to perform serial communication
@@ -576,6 +577,10 @@ export class ESPLoader {
 
     try {
       const resp = await this.command(0x08, cmd, undefined, undefined, 100);
+      // ROM bootloaders send some non-zero "val" response. The flasher stub sends 0.
+      // If we receive 0 then it probably indicates that the chip wasn't or couldn't be
+      // reseted properly and esptool is talking to the flasher stub.
+      this.syncStubDetected = resp[0] == 0;
       return resp;
     } catch (e) {
       this.debug("Sync err " + e);
@@ -620,6 +625,7 @@ export class ESPLoader {
     i = 7;
     while (i--) {
       try {
+        this.syncStubDetected = false;
         const resp = await this.sync();
         this.debug(resp[0].toString());
         return "success";
@@ -1140,6 +1146,11 @@ export class ESPLoader {
    * @returns {ROM} The Chip ROM
    */
   async runStub(): Promise<ROM> {
+    if (this.syncStubDetected) {
+      this.info("Stub already running!");
+      return this.chip;
+    }
+
     this.info("Uploading stub...");
     let decoded = atob(this.chip.ROM_TEXT);
     let chardata = decoded.split("").map(function (x) {
